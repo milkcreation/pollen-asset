@@ -1,6 +1,6 @@
 {
   "name": "pollen-solutions/asset",
-  "description": "Pollen Asset Component",
+  "description": "Pollen Asset Component - Manage CSS styles, JS scripts, ...",
   "homepage": "https://www.presstify.com/pollen-solutions/asset/",
   "keywords": [
     "presstify",
@@ -8,7 +8,7 @@
     "wordpress",
     "asset"
   ],
-  "time": "2021-03-05",
+  "time": "2021-03-06",
   "license": "MIT",
   "authors": [
     {

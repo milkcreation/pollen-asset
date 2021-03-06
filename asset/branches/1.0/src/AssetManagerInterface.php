@@ -59,4 +59,23 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @return string
      */
     public function headerScripts(): string;
+
+    /**
+     * Définition de la minification des styles CSS.
+     *
+     * @param bool $minify
+     *
+     * @return static
+     */
+    public function setMinifyCss(bool $minify = true): AssetManagerInterface;
+
+    /**
+     * Définition de la minification des scripts JS.
+     *
+     * @param bool $minify
+     *
+     * @return static
+     */
+    public function setMinifyJs(bool $minify = true): AssetManagerInterface;
+
 }
