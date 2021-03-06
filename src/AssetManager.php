@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Pollen\Asset;
 
 use InvalidArgumentException;
-//use MatthiasMullie\Minify\CSS as MinifyCss;
-//use MatthiasMullie\Minify\JS as MinifyJs;
+use MatthiasMullie\Minify\CSS as MinifyCss;
+use MatthiasMullie\Minify\JS as MinifyJs;
 use Pollen\Support\Concerns\ConfigBagAwareTrait;
 use Pollen\Support\Proxy\ContainerProxy;
 use Psr\Container\ContainerInterface as Container;
@@ -118,7 +118,7 @@ class AssetManager implements AssetManagerInterface
      */
     public function addInlineCss(string $css): AssetManagerInterface
     {
-        $this->inlineCss = $css;
+        $this->inlineCss[] = $css;
 
         return $this;
     }
@@ -144,18 +144,20 @@ class AssetManager implements AssetManagerInterface
     {
         $concatJs = '';
         foreach ($this->footerGlobalJsVars as $key => $vars) {
-            if (!in_array($key, $this->headerJsVarsKeys, true)) {
-                $concatJs .= "let {$key}= " . $this->normalizeVars($vars) . ";";
+            if (is_array($vars) && in_array($key, $this->headerJsVarsKeys, true)) {
+                foreach ($vars as $k => $v) {
+                    $concatJs .= "{$key}['$k']=" . $this->normalizeVars($v) . ";";
+                }
             } else {
-                throw new RuntimeException('Asset Header global var key exists');
+                $concatJs .= "let {$key}=" . $this->normalizeVars($vars) . ";";
             }
         }
 
-        foreach ($this->inlineCss as $inlineCss) {
-            $concatJs .= $this->normalizeStr($inlineCss) . ";";
+        foreach ($this->footerInlineJs as $inlineJs) {
+            $concatJs .= $this->normalizeStr($inlineJs) . ";";
         }
 
-        if ($concatJs && $this->minifyCss) {
+        if ($concatJs && $this->minifyJs) {
             $concatJs = (new MinifyJs($concatJs))->minify();
         }
 
@@ -191,18 +193,38 @@ class AssetManager implements AssetManagerInterface
         $concatJs = '';
         foreach ($this->headerGlobalJsVars as $key => $vars) {
             $this->headerJsVarsKeys[] = $key;
-            $concatJs .= "let {$key}= " . $this->normalizeVars($vars) . ";";
+            $concatJs .= "let {$key}=" . $this->normalizeVars($vars) . ";";
         }
 
-        foreach ($this->inlineCss as $inlineCss) {
-            $concatJs .= $this->normalizeStr($inlineCss) . ";";
+        foreach ($this->headerInlineJs as $inlineJs) {
+            $concatJs .= $this->normalizeStr($inlineJs) . ";";
         }
 
-        if ($concatJs && $this->minifyCss) {
+        if ($concatJs && $this->minifyJs) {
             $concatJs = (new MinifyJs($concatJs))->minify();
         }
 
         return $concatJs ? "<script type=\"text/javascript\">/* <![CDATA[ */{$concatJs}/* ]]> */</script>" : '';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setMinifyCss(bool $minify = true): AssetManagerInterface
+    {
+        $this->minifyCss = $minify;
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setMinifyJs(bool $minify = true): AssetManagerInterface
+    {
+        $this->minifyJs = $minify;
+
+        return $this;
     }
 
     /**
@@ -240,7 +262,7 @@ class AssetManager implements AssetManagerInterface
                 $vars = '';
             }
         } elseif (is_scalar($vars)) {
-            $vars = (is_bool($vars) || is_int($vars)) ? $vars : $this->normalizeStr((string)$vars);
+            $vars = (is_bool($vars) || is_int($vars)) ? $vars : "'". $this->normalizeStr((string)$vars) . "'";
         } else {
             throw new InvalidArgumentException(
                 'Type of Asset vars are invalid. Only scalar or array of scalar allowed.'
