@@ -30,6 +30,11 @@ class AssetManager implements AssetManagerInterface
     private $headerJsVarsKeys = [];
 
     /**
+     * @var array
+     */
+    protected $assetsBag = [];
+
+    /**
      * @var string[]
      */
     protected $inlineCss = [];
@@ -140,6 +145,22 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
+    public function all(): array
+    {
+        return $this->assetsBag;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function exists(): bool
+    {
+        return !empty($this->assetsBag);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function footerScripts(): string
     {
         $concatJs = '';
@@ -162,6 +183,14 @@ class AssetManager implements AssetManagerInterface
         }
 
         return $concatJs ? "<script type=\"text/javascript\">/* <![CDATA[ */{$concatJs}/* ]]> */</script>": '';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function get(string $key, string $default = ''): string
+    {
+        return $this->assetsBag[$key] ?? $default;
     }
 
     /**
@@ -205,6 +234,51 @@ class AssetManager implements AssetManagerInterface
         }
 
         return $concatJs ? "<script type=\"text/javascript\">/* <![CDATA[ */{$concatJs}/* ]]> */</script>" : '';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function set($key, ?string $value = ''): AssetManagerInterface
+    {
+        if (is_string($key)) {
+            $key = [$key => $value];
+        }
+
+        if (is_array($key)) {
+            foreach($key as $k => $v) {
+                if (is_string($v)) {
+                    $this->assetsBag[$k] = $v;
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setManifestJson(string $manifestJson, callable $fallback = null): AssetManagerInterface
+    {
+        if (!file_exists($manifestJson)) {
+            throw new RuntimeException('Assets Manifest Json file unavailable');
+        }
+
+        try {
+            $content = file_get_contents($manifestJson);
+            $datas = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable $e) {
+            throw new RuntimeException('Assets Manifest Json file invalid');
+        }
+
+        if ($fallback !== null) {
+            array_walk($datas, $fallback);
+        }
+
+       $this->set($datas);
+
+        return $this;
     }
 
     /**
