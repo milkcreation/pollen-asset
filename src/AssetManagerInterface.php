@@ -42,7 +42,7 @@ interface AssetManagerInterface extends ContainerProxyInterface
     /**
      * Récupération de la liste des assets déclarés.
      *
-     * @return array
+     * @return AssetInterface[]|array
      */
     public function all(): array;
 
@@ -61,14 +61,34 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function footerScripts(): string;
 
     /**
-     * Récupération du chemin vers un asset.
+     * Récupération de l'instance d'un asset.
      *
-     * @param string $key
-     * @param string $default
+     * @param string $name
+     *
+     * @return AssetInterface|null
+     */
+    public function get(string $name): ?AssetInterface;
+
+    /**
+     * Récupération du chemin absolu vers le répertoire de dépôt des assets.
      *
      * @return string
      */
-    public function get(string $key, string $default = ''): string;
+    public function getBaseDir(): string;
+
+    /**
+     * Récupération de l'url absolue vers le répertoire de base de dépôt des assets.
+     *
+     * @return string
+     */
+    public function getBaseUrl(): string;
+
+    /**
+     * Récupération du préfixe de l'url relative vers le répertoire de base de dépôt des assets.
+     *
+     * @return string
+     */
+    public function getRelPrefix(): string;
 
     /**
      * Récupération des styles CSS de l'entête du site.
@@ -85,14 +105,32 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function headerScripts(): string;
 
     /**
-     * Définition des assets.
+     * Définition de l'instance d'un asset.
      *
-     * @param string|array $key
-     * @param string|null $value
+     * @param string $name
+     * @param string $path
      *
      * @return static
      */
-    public function set($key, string $value = ''): AssetManagerInterface;
+    public function setAsset(string $name, string $path): AssetManagerInterface;
+
+    /**
+     * Définition du chemin absolu vers le répertoire de dépôt des assets.
+     *
+     * @param string $baseDir
+     *
+     * @return static
+     */
+    public function setBaseDir(string $baseDir): AssetManagerInterface;
+
+    /**
+     * Définition de l'url absolue vers le répertoire de base de dépôt des assets.
+     *
+     * @param string $baseUrl
+     *
+     * @return static
+     */
+    public function setBaseUrl(string $baseUrl): AssetManagerInterface;
 
     /**
      * Définition d'un fichier Manifest JSON de déclaration des assets.
@@ -122,4 +160,12 @@ interface AssetManagerInterface extends ContainerProxyInterface
      */
     public function setMinifyJs(bool $minify = true): AssetManagerInterface;
 
+    /**
+     * Définition du préfixe de l'url relative vers le répertoire de base de dépôt des assets.
+     *
+     * @param string $relPrefix
+     *
+     * @return static
+     */
+    public function setRelPrefix(string $relPrefix): AssetManagerInterface;
 }

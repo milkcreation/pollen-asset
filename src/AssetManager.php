@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use MatthiasMullie\Minify\CSS as MinifyCss;
 use MatthiasMullie\Minify\JS as MinifyJs;
 use Pollen\Support\Concerns\ConfigBagAwareTrait;
+use Pollen\Support\Filesystem;
 use Pollen\Support\Proxy\ContainerProxy;
 use Psr\Container\ContainerInterface as Container;
 use RuntimeException;
@@ -30,9 +31,19 @@ class AssetManager implements AssetManagerInterface
     private $headerJsVarsKeys = [];
 
     /**
-     * @var array
+     * @var AssetInterface[]|array
      */
-    protected $assetsBag = [];
+    protected $assets = [];
+
+    /**
+     * @var string
+     */
+    protected $baseDir = '';
+
+    /**
+     * @var string
+     */
+    protected $baseUrl = '';
 
     /**
      * @var string[]
@@ -68,6 +79,11 @@ class AssetManager implements AssetManagerInterface
      * @var bool
      */
     protected $minifyJs = false;
+
+    /**
+     * @var string|false
+     */
+    protected $relPrefix = '';
 
     /**
      * @param array $config
@@ -147,7 +163,7 @@ class AssetManager implements AssetManagerInterface
      */
     public function all(): array
     {
-        return $this->assetsBag;
+        return $this->assets;
     }
 
     /**
@@ -155,7 +171,7 @@ class AssetManager implements AssetManagerInterface
      */
     public function exists(): bool
     {
-        return !empty($this->assetsBag);
+        return !empty($this->assets);
     }
 
     /**
@@ -188,9 +204,33 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function get(string $key, string $default = ''): string
+    public function get(string $name): ?AssetInterface
     {
-        return $this->assetsBag[$key] ?? $default;
+        return $this->assets[$name] ?? null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBaseDir(): string
+    {
+        return $this->baseDir;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getRelPrefix(): string
+    {
+        return $this->relPrefix;
     }
 
     /**
@@ -237,21 +277,44 @@ class AssetManager implements AssetManagerInterface
     }
 
     /**
+     * Déclaration d'une instance d'asset.
+     *
+     * @param string $name
+     * @param string $path
+     *
+     * @return AssetInterface
+     */
+    protected function registerAsset(string $name, string $path): AssetInterface
+    {
+        return $this->assets[$name] = new Asset($name, $path, $this);
+    }
+
+    /**
      * @inheritDoc
      */
-    public function set($key, ?string $value = ''): AssetManagerInterface
+    public function setAsset(string $name, string $path): AssetManagerInterface
     {
-        if (is_string($key)) {
-            $key = [$key => $value];
-        }
+        $this->registerAsset($name, $path);
 
-        if (is_array($key)) {
-            foreach($key as $k => $v) {
-                if (is_string($v)) {
-                    $this->assetsBag[$k] = $v;
-                }
-            }
-        }
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setBaseDir(string $baseDir): AssetManagerInterface
+    {
+        $this->baseDir = Filesystem::normalizePath($baseDir);
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setBaseUrl(string $baseUrl): AssetManagerInterface
+    {
+        $this->baseUrl = Filesystem::normalizePath($baseUrl);
 
         return $this;
     }
@@ -272,11 +335,14 @@ class AssetManager implements AssetManagerInterface
             throw new RuntimeException('Assets Manifest Json file invalid');
         }
 
-        if ($fallback !== null) {
-            array_walk($datas, $fallback);
+        $assets = [];
+        foreach ($datas as $name => $path) {
+            $assets[] = $this->registerAsset($name, $path);
         }
 
-       $this->set($datas);
+        if ($fallback !== null) {
+            array_walk($assets, $fallback);
+        }
 
         return $this;
     }
@@ -297,6 +363,16 @@ class AssetManager implements AssetManagerInterface
     public function setMinifyJs(bool $minify = true): AssetManagerInterface
     {
         $this->minifyJs = $minify;
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function setRelPrefix(string $relPrefix): AssetManagerInterface
+    {
+        $this->relPrefix = Filesystem::normalizePath($relPrefix);
 
         return $this;
     }
