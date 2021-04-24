@@ -184,10 +184,10 @@ class AssetManager implements AssetManagerInterface
         foreach ($this->footerGlobalJsVars as $key => $vars) {
             if (is_array($vars) && in_array($key, $this->headerJsVarsKeys, true)) {
                 foreach ($vars as $k => $v) {
-                    $concatJs .= "{$key}['$k']=" . $this->normalizeVars($v) . ";";
+                    $concatJs .= $key . "['$k']=" . $this->normalizeVars($v) . ";";
                 }
             } else {
-                $concatJs .= "let {$key}=" . $this->normalizeVars($vars) . ";";
+                $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
             }
         }
 
@@ -199,7 +199,10 @@ class AssetManager implements AssetManagerInterface
             $concatJs = (new MinifyJs($concatJs))->minify();
         }
 
-        return $concatJs ? "<script type=\"text/javascript\">/* <![CDATA[ */{$concatJs}/* ]]> */</script>": '';
+        return $concatJs ? "<!-- Footer Scripts -->" .
+            "<script type=\"text/javascript\">/* <![CDATA[ */$concatJs/* ]]> */</script>" .
+            "<!-- Footer Scripts -->"
+            : '';
     }
 
     /**
@@ -252,7 +255,10 @@ class AssetManager implements AssetManagerInterface
             $concatCss = (new MinifyCss($concatCss))->minify();
         }
 
-        return $concatCss ? "<style type=\"text/css\">{$concatCss}</style>": '';
+        return $concatCss ? "<!-- Header Styles -->" .
+            "<style>$concatCss</style>" .
+            "<!-- / Header Styles -->"
+            : '';
     }
 
     /**
@@ -263,7 +269,7 @@ class AssetManager implements AssetManagerInterface
         $concatJs = '';
         foreach ($this->headerGlobalJsVars as $key => $vars) {
             $this->headerJsVarsKeys[] = $key;
-            $concatJs .= "let {$key}=" . $this->normalizeVars($vars) . ";";
+            $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
         }
 
         foreach ($this->headerInlineJs as $inlineJs) {
@@ -274,7 +280,10 @@ class AssetManager implements AssetManagerInterface
             $concatJs = (new MinifyJs($concatJs))->minify();
         }
 
-        return $concatJs ? "<script type=\"text/javascript\">/* <![CDATA[ */{$concatJs}/* ]]> */</script>" : '';
+        return $concatJs ? "<!-- Header Scripts -->" .
+            "<script type=\"text/javascript\">/* <![CDATA[ */$concatJs/* ]]> */</script>" .
+            "<!-- / Header Scripts -->"
+            : '';
     }
 
     /**
@@ -400,7 +409,7 @@ class AssetManager implements AssetManagerInterface
     protected function normalizeVars($vars): string
     {
         if (is_array($vars)) {
-            foreach ($vars as $k => &$v) {
+            foreach ($vars as &$v) {
                 if (is_scalar($v)) {
                     $v = (is_bool($v) || is_int($v)) ? $v : $this->normalizeStr((string)$v);
                 }

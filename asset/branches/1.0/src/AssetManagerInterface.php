@@ -18,7 +18,7 @@ interface AssetManagerInterface extends ContainerProxyInterface
      *
      * @return static
      */
-    public function addGlobalJsVar(string $key, $value, bool $inFooter = true, ?string $namespace = 'app'): AssetManagerInterface;
+    public function addGlobalJsVar(string $key, $value, bool $inFooter = false, ?string $namespace = 'app'): AssetManagerInterface;
 
     /**
      * Ajout de styles CSS en ligne.
