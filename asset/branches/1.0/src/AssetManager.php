@@ -170,6 +170,26 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
+    public function enableMinifyCss(bool $minify = true): AssetManagerInterface
+    {
+        $this->minifyCss = $minify;
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enableMinifyJs(bool $minify = true): AssetManagerInterface
+    {
+        $this->minifyJs = $minify;
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function exists(): bool
     {
         return !empty($this->assets);
@@ -353,26 +373,6 @@ class AssetManager implements AssetManagerInterface
         if ($fallback !== null) {
             array_walk($assets, $fallback);
         }
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setMinifyCss(bool $minify = true): AssetManagerInterface
-    {
-        $this->minifyCss = $minify;
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setMinifyJs(bool $minify = true): AssetManagerInterface
-    {
-        $this->minifyJs = $minify;
 
         return $this;
     }

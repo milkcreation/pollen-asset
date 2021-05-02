@@ -47,6 +47,24 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function all(): array;
 
     /**
+     * Activation de la minification des styles CSS.
+     *
+     * @param bool $minify
+     *
+     * @return static
+     */
+    public function enableMinifyCss(bool $minify = true): AssetManagerInterface;
+
+    /**
+     * Activation de la minification des scripts JS.
+     *
+     * @param bool $minify
+     *
+     * @return static
+     */
+    public function enableMinifyJs(bool $minify = true): AssetManagerInterface;
+
+    /**
      * Vérification d'existence des assets déclarés.
      *
      * @return bool
@@ -141,24 +159,6 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @return AssetManagerInterface
      */
     public function setManifestJson(string $manifestJson, callable $fallback = null): AssetManagerInterface;
-
-    /**
-     * Définition de la minification des styles CSS.
-     *
-     * @param bool $minify
-     *
-     * @return static
-     */
-    public function setMinifyCss(bool $minify = true): AssetManagerInterface;
-
-    /**
-     * Définition de la minification des scripts JS.
-     *
-     * @param bool $minify
-     *
-     * @return static
-     */
-    public function setMinifyJs(bool $minify = true): AssetManagerInterface;
 
     /**
      * Définition du préfixe de l'url relative vers le répertoire de base de dépôt des assets.
