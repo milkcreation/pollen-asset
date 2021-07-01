@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Pollen\Asset;
 
-use Pollen\Container\BootableServiceProvider;
+use Pollen\Container\ServiceProvider;
 
-class AssetServiceProvider extends BootableServiceProvider
+class AssetServiceProvider extends ServiceProvider
 {
-    /**
-     * @var string[]
-     */
     protected $provides = [
         AssetManagerInterface::class
     ];

@@ -4,24 +4,44 @@ declare(strict_types=1);
 
 namespace Pollen\Asset;
 
+use Pollen\Asset\Queues\CssAssetQueue;
+use Pollen\Asset\Queues\HtmlQueue;
+use Pollen\Asset\Queues\JsAssetQueue;
+use Pollen\Asset\Queues\LinkTagQueue;
+use Pollen\Asset\Queues\MetaTagQueue;
+use Pollen\Asset\Queues\TitleTagQueue;
 use Pollen\Support\Proxy\ContainerProxyInterface;
 
 interface AssetManagerInterface extends ContainerProxyInterface
 {
     /**
-     * Ajout d'une variable JS.
+     * Add a global JS variable.
      *
-     * @param string $key Clé d'indice.
-     * @param mixed $value Valeur.
-     * @param boolean $inFooter.
+     * @param string $key
+     * @param mixed $value
+     * @param boolean $inFooter
      * @param string|null $namespace
      *
      * @return static
      */
-    public function addGlobalJsVar(string $key, $value, bool $inFooter = false, ?string $namespace = 'app'): AssetManagerInterface;
+    public function addGlobalJsVar(
+        string $key,
+        $value,
+        bool $inFooter = false,
+        ?string $namespace = 'app'
+    ): AssetManagerInterface;
 
     /**
-     * Ajout de styles CSS en ligne.
+     * Add new instance of an asset.
+     *
+     * @param AssetInterface $asset
+     *
+     * @return static
+     */
+    public function addAsset(AssetInterface $asset): AssetManagerInterface;
+
+    /**
+     * Add inline CSS styles.
      *
      * @param string $css
      *
@@ -30,7 +50,7 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function addInlineCss(string $css): AssetManagerInterface;
 
     /**
-     * Définition de styles JS.
+     *  Add inline Js scripts.
      *
      * @param string $js
      * @param boolean $inFooter
@@ -40,46 +60,127 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function addInlineJs(string $js, bool $inFooter = false): AssetManagerInterface;
 
     /**
-     * Récupération de la liste des assets déclarés.
+     * Get list of registered assets instances.
      *
      * @return AssetInterface[]|array
      */
     public function all(): array;
 
     /**
-     * Activation de la minification des styles CSS.
-     *
-     * @param bool $minify
+     * Remove an asset from queue.
      *
      * @return static
      */
-    public function enableMinifyCss(bool $minify = true): AssetManagerInterface;
+    public function dequeue(string $name): AssetManagerInterface;
 
     /**
-     * Activation de la minification des scripts JS.
+     * Add queue instance in queue.
      *
-     * @param bool $minify
+     * @param QueueInterface $queue
+     * @param string|null $name
      *
      * @return static
      */
-    public function enableMinifyJs(bool $minify = true): AssetManagerInterface;
+    public function enqueue(QueueInterface $queue, ?string $name = null): AssetManagerInterface;
 
     /**
-     * Vérification d'existence des assets déclarés.
+     * Add a registered asset in CSS queue.
      *
-     * @return bool
-     */
-    public function exists(): bool;
-
-    /**
-     * Récupération des scripts JS du pied de page du site.
+     * @param AssetInterface $asset
+     * @param array $htmlAttrs
+     * @param int $priority
      *
-     * @return string
+     * @return AssetQueueInterface
      */
-    public function footerScripts(): string;
+    public function enqueueCss(
+        AssetInterface $asset,
+        array $htmlAttrs = [],
+        int $priority = CssAssetQueue::NORMAL
+    ): AssetQueueInterface;
 
     /**
-     * Récupération de l'instance d'un asset.
+     * Add HTML contents in queue.
+     *
+     * @param string $html
+     * @param bool $inFooter
+     * @param int $priority
+     *
+     * @return QueueInterface
+     */
+    public function enqueueHtml(
+        string $html,
+        bool $inFooter = false,
+        int $priority = HtmlQueue::NORMAL
+    ): QueueInterface;
+
+    /**
+     * Add a registered asset in JS queue.
+     *
+     * @param AssetInterface $asset
+     * @param bool $inFooter
+     * @param array $htmlAttrs
+     * @param int $priority
+     *
+     * @return AssetQueueInterface
+     */
+    public function enqueueJs(
+        AssetInterface $asset,
+        bool $inFooter = false,
+        array $htmlAttrs = [],
+        int $priority = JsAssetQueue::NORMAL
+    ): AssetQueueInterface;
+
+    /**
+     * Add a link tag in queue.
+     *
+     * @param string $name
+     * @param string $href
+     * @param array $htmlAttrs
+     * @param int $priority
+     *
+     * @return QueueInterface
+     */
+    public function enqueueLink(
+        string $name,
+        string $href,
+        array $htmlAttrs = [],
+        int $priority = LinkTagQueue::NORMAL
+    ): QueueInterface;
+
+    /**
+     * Add a meta tag in queue.
+     *
+     * @param string $name
+     * @param string $content
+     * @param array $htmlAttrs
+     * @param int $priority
+     *
+     * @return QueueInterface
+     */
+    public function enqueueMeta(
+        string $name,
+        string $content,
+        array $htmlAttrs = [],
+        int $priority = MetaTagQueue::NORMAL
+    ): QueueInterface;
+
+    /**
+     * Add the meta tag title in queue.
+     *
+     * @param string $title
+     * @param array $htmlAttrs
+     * @param int $priority
+     *
+     * @return QueueInterface
+     */
+    public function enqueueTitle(
+        string $title,
+        array $htmlAttrs = [],
+        int $priority = TitleTagQueue::NORMAL
+    ): QueueInterface;
+
+    /**
+     * Get an registered asset instance.
      *
      * @param string $name
      *
@@ -88,84 +189,55 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function get(string $name): ?AssetInterface;
 
     /**
-     * Récupération du chemin absolu vers le répertoire de dépôt des assets.
+     * Get base path of assets.
+     *
+     * @return string|null
+     */
+    public function getBasePath(): ?string;
+
+    /**
+     * Get base url of assets.
+     *
+     * @return string|null
+     */
+    public function getBaseUrl(): ?string;
+
+    /**
+     * HTML head queue handling.
      *
      * @return string
      */
-    public function getBaseDir(): string;
+    public function handleHeadQueue(): string;
 
     /**
-     * Récupération de l'url absolue vers le répertoire de base de dépôt des assets.
+     * HTML footer queue handling.
      *
      * @return string
      */
-    public function getBaseUrl(): string;
+    public function handleFooterQueue(): string;
 
     /**
-     * Récupération du préfixe de l'url relative vers le répertoire de base de dépôt des assets.
+     * Check if registered assets exists.
      *
-     * @return string
+     * @return bool
      */
-    public function getRelPrefix(): string;
+    public function has(): bool;
 
     /**
-     * Récupération des styles CSS de l'entête du site.
+     * Set base directory of assets.
      *
-     * @return string
-     */
-    public function headerStyles(): string;
-
-    /**
-     * Récupération des scripts JS de l'entête du site.
-     *
-     * @return string
-     */
-    public function headerScripts(): string;
-
-    /**
-     * Définition de l'instance d'un asset.
-     *
-     * @param string $name
-     * @param string $path
+     * @param string $basePath
      *
      * @return static
      */
-    public function setAsset(string $name, string $path): AssetManagerInterface;
+    public function setBasePath(string $basePath): AssetManagerInterface;
 
     /**
-     * Définition du chemin absolu vers le répertoire de dépôt des assets.
-     *
-     * @param string $baseDir
-     *
-     * @return static
-     */
-    public function setBaseDir(string $baseDir): AssetManagerInterface;
-
-    /**
-     * Définition de l'url absolue vers le répertoire de base de dépôt des assets.
+     * Set base url of assets.
      *
      * @param string $baseUrl
      *
      * @return static
      */
     public function setBaseUrl(string $baseUrl): AssetManagerInterface;
-
-    /**
-     * Définition d'un fichier Manifest JSON de déclaration des assets.
-     *
-     * @param string $manifestJson
-     * @param callable|null $fallback
-     *
-     * @return AssetManagerInterface
-     */
-    public function setManifestJson(string $manifestJson, callable $fallback = null): AssetManagerInterface;
-
-    /**
-     * Définition du préfixe de l'url relative vers le répertoire de base de dépôt des assets.
-     *
-     * @param string $relPrefix
-     *
-     * @return static
-     */
-    public function setRelPrefix(string $relPrefix): AssetManagerInterface;
 }

@@ -5,86 +5,111 @@ declare(strict_types=1);
 namespace Pollen\Asset;
 
 use InvalidArgumentException;
-use MatthiasMullie\Minify\CSS as MinifyCss;
-use MatthiasMullie\Minify\JS as MinifyJs;
+use Illuminate\Support\Collection;
+use Pollen\Asset\Assets\InlineAsset;
+use Pollen\Asset\Queues\CssAssetQueue;
+use Pollen\Asset\Queues\HtmlQueue;
+use Pollen\Asset\Queues\JsAssetQueue;
+use Pollen\Asset\Queues\LinkTagQueue;
+use Pollen\Asset\Queues\MetaTagQueue;
+use Pollen\Asset\Queues\TitleTagQueue;
 use Pollen\Support\Concerns\ConfigBagAwareTrait;
 use Pollen\Support\Exception\ManagerRuntimeException;
-use Pollen\Support\Filesystem;
+use Pollen\Support\Filesystem as fs;
 use Pollen\Support\Proxy\ContainerProxy;
+use Pollen\Support\Proxy\EventProxy;
 use Psr\Container\ContainerInterface as Container;
-use RuntimeException;
 use Throwable;
 
 class AssetManager implements AssetManagerInterface
 {
     use ConfigBagAwareTrait;
     use ContainerProxy;
+    use EventProxy;
 
     /**
-     * Instance principale.
+     * Asset Manager main instance.
      * @var static|null
      */
-    private static $instance;
+    private static ?AssetManagerInterface $instance = null;
 
     /**
+     * List of existing HTML head JS global variables names.
      * @var array
      */
-    private $headerJsVarsKeys = [];
+    private array $headJsVarsNames = [];
 
     /**
-     * @var AssetInterface[]|array
+     * List of registered assets instances.
+     * @var AssetInterface[]
      */
-    protected $assets = [];
+    protected array $assets = [];
 
     /**
-     * @var string
+     * Assets Path.
+     * @var string|null
      */
-    protected $baseDir = '';
+    protected ?string $basePath = null;
 
     /**
-     * @var string
+     * Assets Url.
+     * @var string|null
      */
-    protected $baseUrl = '';
+    protected ?string $baseUrl = null;
 
     /**
+     * List of inline JS scripts to include in HTML footer.
      * @var string[]
      */
-    protected $inlineCss = [];
+    protected array $footerInlineJs = [];
 
     /**
-     * @var string[]
-     */
-    protected $headerInlineJs = [];
-
-    /**
-     * @var string[]
-     */
-    protected $footerInlineJs = [];
-
-    /**
+     * List of JS global variables to include in HTML footer.
      * @var array
      */
-    protected $footerGlobalJsVars = [];
+    protected array $footerGlobalJsVars = [];
 
     /**
+     * List of inline JS scripts to include in HTML head.
+     * @var string[]
+     */
+    protected array $headInlineJs = [];
+
+    /**
+     * List of JS global variables to include in HTML head.
      * @var array
      */
-    protected $headerGlobalJsVars = [];
+    protected array $headGlobalJsVars = [];
 
     /**
-     * @var bool
+     * List of inline CSS styles to include in HTML head.
+     * @var string[]
      */
-    protected $minifyCss = false;
+    protected array $inlineCss = [];
 
     /**
-     * @var bool
+     * List of queued assets.
+     * @var array<string, QueueInterface>
      */
-    protected $minifyJs = false;
+    protected array $queuedAssets = [];
 
     /**
-     * @var string|false
+     * List of queuing errors.
+     * @var string[]
      */
-    protected $relPrefix = '';
+    private array $queuingErrors = [];
+
+    /**
+     * List of asset render in HTML head queue.
+     * @var array<string, string>
+     */
+    private array $headQueue = [];
+
+    /**
+     * List of asset render in HTML footer queue.
+     * @var array<string, string>
+     */
+    private array $footerQueue = [];
 
     /**
      * @param array $config
@@ -106,7 +131,7 @@ class AssetManager implements AssetManagerInterface
     }
 
     /**
-     * Récupération de l'instance principale.
+     * Get Asset Manager main instance.
      *
      * @return static
      */
@@ -121,9 +146,13 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function addGlobalJsVar(string $key, $value, bool $inFooter = false, ?string $namespace = 'app'): AssetManagerInterface
-    {
-        $argKey = $inFooter ? 'footerGlobalJsVars' : 'headerGlobalJsVars';
+    public function addGlobalJsVar(
+        string $key,
+        $value,
+        bool $inFooter = false,
+        ?string $namespace = 'app'
+    ): AssetManagerInterface {
+        $argKey = $inFooter ? 'footerGlobalJsVars' : 'headGlobalJsVars';
 
         if ($namespace === null) {
             $this->{$argKey}[$key] = $value;
@@ -131,6 +160,16 @@ class AssetManager implements AssetManagerInterface
             $this->{$argKey}[$namespace] = $this->{$argKey}[$namespace] ?? [];
             $this->{$argKey}[$namespace][$key] = $value;
         }
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function addAsset(AssetInterface $asset): AssetManagerInterface
+    {
+        $this->assets[$asset->getName()] = $asset;
 
         return $this;
     }
@@ -153,7 +192,7 @@ class AssetManager implements AssetManagerInterface
         if ($inFooter) {
             $this->footerInlineJs[] = $js;
         } else {
-            $this->headerInlineJs[] = $js;
+            $this->headInlineJs[] = $js;
         }
 
         return $this;
@@ -170,9 +209,9 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function enableMinifyCss(bool $minify = true): AssetManagerInterface
+    public function dequeue(string $name): AssetManagerInterface
     {
-        $this->minifyCss = $minify;
+        unset($this->queuedAssets[$name]);
 
         return $this;
     }
@@ -180,49 +219,103 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function enableMinifyJs(bool $minify = true): AssetManagerInterface
+    public function enqueue(QueueInterface $queue, ?string $name = null): AssetManagerInterface
     {
-        $this->minifyJs = $minify;
-
+        if ($name !== null) {
+            $this->queuedAssets[$name] = $queue;
+        } else {
+            $this->queuedAssets[] = $queue;
+        }
         return $this;
     }
 
     /**
      * @inheritDoc
      */
-    public function exists(): bool
-    {
-        return !empty($this->assets);
+    public function enqueueCss(
+        AssetInterface $asset,
+        array $htmlAttrs = [],
+        int $priority = CssAssetQueue::NORMAL
+    ): AssetQueueInterface {
+        if (!$this->get($asset->getName())) {
+            $this->addAsset($asset);
+        }
+
+        $this->enqueue($queue = new CssAssetQueue($asset, $htmlAttrs, $priority), $asset->getName());
+
+        return $queue;
     }
 
     /**
      * @inheritDoc
      */
-    public function footerScripts(): string
-    {
-        $concatJs = '';
-        foreach ($this->footerGlobalJsVars as $key => $vars) {
-            if (is_array($vars) && in_array($key, $this->headerJsVarsKeys, true)) {
-                foreach ($vars as $k => $v) {
-                    $concatJs .= $key . "['$k']=" . $this->normalizeVars($v) . ";";
-                }
-            } else {
-                $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
-            }
+    public function enqueueHtml(
+        string $html,
+        bool $inFooter = false,
+        int $priority = HtmlQueue::NORMAL
+    ): QueueInterface {
+        $this->enqueue($queue = new HtmlQueue($html, $inFooter, $priority));
+
+        return $queue;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enqueueJs(
+        AssetInterface $asset,
+        bool $inFooter = false,
+        array $htmlAttrs = [],
+        int $priority = JsAssetQueue::NORMAL
+    ): AssetQueueInterface {
+        if (!$this->get($asset->getName())) {
+            $this->addAsset($asset);
         }
 
-        foreach ($this->footerInlineJs as $inlineJs) {
-            $concatJs .= $this->normalizeStr($inlineJs) . ";";
-        }
+        $this->enqueue($queue = new JsAssetQueue($asset, $inFooter, $htmlAttrs, $priority), $asset->getName());
 
-        if ($concatJs && $this->minifyJs) {
-            $concatJs = (new MinifyJs($concatJs))->minify();
-        }
+        return $queue;
+    }
 
-        return $concatJs ? "<!-- Footer Scripts -->" .
-            "<script type=\"text/javascript\">/* <![CDATA[ */$concatJs/* ]]> */</script>" .
-            "<!-- Footer Scripts -->"
-            : '';
+    /**
+     * @inheritDoc
+     */
+    public function enqueueLink(
+        string $name,
+        string $href,
+        array $htmlAttrs = [],
+        int $priority = LinkTagQueue::NORMAL
+    ): QueueInterface {
+        $this->enqueue($queue = new LinkTagQueue($href, $name, $htmlAttrs, $priority), "_link.$name");
+
+        return $queue;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enqueueMeta(
+        string $name,
+        string $content,
+        array $htmlAttrs = [],
+        int $priority = MetaTagQueue::NORMAL
+    ): QueueInterface {
+        $this->enqueue($queue = new MetaTagQueue($content, $name, $htmlAttrs, $priority), "_meta.$name");
+
+        return $queue;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enqueueTitle(
+        string $title,
+        array $htmlAttrs = [],
+        int $priority = TitleTagQueue::NORMAL
+    ): QueueInterface {
+        $this->enqueue($queue = new TitleTagQueue($title, $htmlAttrs, $priority), '_title');
+
+        return $queue;
     }
 
     /**
@@ -236,15 +329,15 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function getBaseDir(): string
+    public function getBasePath(): ?string
     {
-        return $this->baseDir;
+        return $this->basePath;
     }
 
     /**
      * @inheritDoc
      */
-    public function getBaseUrl(): string
+    public function getBaseUrl(): ?string
     {
         return $this->baseUrl;
     }
@@ -252,89 +345,99 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function getRelPrefix(): string
+    public function handleHeadQueue(): string
     {
-        return $this->relPrefix;
+        $this->event()->trigger('asset.handle-head.before', [$this]);
+
+        if ($cssContents = $this->concatHeadInlineCss()) {
+            $this->enqueueCss(new InlineAsset('_head-inline-css', $cssContents), [], CssAssetQueue::NORMAL + 1);
+        }
+
+        if ($jsContents = $this->concatHeadInlineJs()) {
+            $this->enqueueJs(new InlineAsset('_head-inline-js', $jsContents), false, [], JsAssetQueue::NORMAL + 1);
+        }
+
+        $this->event()->trigger('asset.handle-head.collect', [$this]);
+
+        $queueCollection = (new Collection($this->queuedAssets))
+            ->filter(
+                function (QueueInterface $queue) {
+                    return !$queue->inFooter();
+                }
+            )
+            ->sortByDesc(
+                function (QueueInterface $queue) {
+                    return $queue->getPriority();
+                }
+            );
+
+        /**
+         * @var string $name
+         * @var QueueInterface $queue
+         */
+        foreach ($queueCollection as $name => $queue) {
+            $this->event()->trigger('asset.handle-head.queue', [$name, $queue, $this]);
+            $this->headQueue[] = $queue->toArray();
+        }
+
+        $this->event()->trigger('asset.handle-head.after', [$this]);
+
+        return implode("\n", array_map([$this, 'mapRenderCallback'], $this->headQueue));
     }
 
     /**
      * @inheritDoc
      */
-    public function headerStyles(): string
+    public function handleFooterQueue(): string
     {
-        $concatCss = '';
-        foreach ($this->inlineCss as $inlineCss) {
-            $concatCss .= $this->normalizeStr($inlineCss);
+        $this->event()->trigger('asset.handle-footer.before', [$this]);
+
+        if ($jsContents = $this->concatFooterInlineJs()) {
+            $this->enqueueJs(new InlineAsset('_footer-inline-js', $jsContents), true, [], JsAssetQueue::NORMAL + 1);
         }
 
-        if (empty($concatCss)) {
-            return '';
+        $this->event()->trigger('asset.handle-footer.collect', [$this]);
+
+        $queueCollection = (new Collection($this->queuedAssets))
+            ->filter(
+                function (QueueInterface $queue) {
+                    return $queue->inFooter();
+                }
+            )
+            ->sortByDesc(
+                function (QueueInterface $queue) {
+                    return $queue->getPriority();
+                }
+            );
+
+        /**
+         * @var string $name
+         * @var QueueInterface $queue
+         */
+        foreach ($queueCollection as $name => $queue) {
+            $this->event()->trigger('asset.handle-footer.queue', [$name, $queue, $this]);
+            $this->footerQueue[] = $queue->toArray();
         }
 
-        if ($concatCss && $this->minifyCss) {
-            $concatCss = (new MinifyCss($concatCss))->minify();
-        }
+        $this->event()->trigger('asset.handle-footer.after', [$this]);
 
-        return $concatCss ? "<!-- Header Styles -->" .
-            "<style>$concatCss</style>" .
-            "<!-- / Header Styles -->"
-            : '';
+        return implode("\n", array_map([$this, 'mapRenderCallback'], $this->footerQueue));
     }
 
     /**
      * @inheritDoc
      */
-    public function headerScripts(): string
+    public function has(): bool
     {
-        $concatJs = '';
-        foreach ($this->headerGlobalJsVars as $key => $vars) {
-            $this->headerJsVarsKeys[] = $key;
-            $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
-        }
-
-        foreach ($this->headerInlineJs as $inlineJs) {
-            $concatJs .= $this->normalizeStr($inlineJs) . ";";
-        }
-
-        if ($concatJs && $this->minifyJs) {
-            $concatJs = (new MinifyJs($concatJs))->minify();
-        }
-
-        return $concatJs ? "<!-- Header Scripts -->" .
-            "<script type=\"text/javascript\">/* <![CDATA[ */$concatJs/* ]]> */</script>" .
-            "<!-- / Header Scripts -->"
-            : '';
-    }
-
-    /**
-     * Déclaration d'une instance d'asset.
-     *
-     * @param string $name
-     * @param string $path
-     *
-     * @return AssetInterface
-     */
-    protected function registerAsset(string $name, string $path): AssetInterface
-    {
-        return $this->assets[$name] = new Asset($name, $path, $this);
+        return !empty($this->assets);
     }
 
     /**
      * @inheritDoc
      */
-    public function setAsset(string $name, string $path): AssetManagerInterface
+    public function setBasePath(string $basePath): AssetManagerInterface
     {
-        $this->registerAsset($name, $path);
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setBaseDir(string $baseDir): AssetManagerInterface
-    {
-        $this->baseDir = Filesystem::normalizePath($baseDir);
+        $this->basePath = fs::normalizePath($basePath);
 
         return $this;
     }
@@ -344,51 +447,73 @@ class AssetManager implements AssetManagerInterface
      */
     public function setBaseUrl(string $baseUrl): AssetManagerInterface
     {
-        $this->baseUrl = Filesystem::normalizePath($baseUrl);
+        $this->baseUrl = fs::normalizePath($baseUrl);
 
         return $this;
     }
 
     /**
-     * @inheritDoc
+     * HTML head inline CSS concatenation.
+     *
+     * @return string
      */
-    public function setManifestJson(string $manifestJson, callable $fallback = null): AssetManagerInterface
+    protected function concatHeadInlineCss(): string
     {
-        if (!file_exists($manifestJson)) {
-            throw new RuntimeException('Assets Manifest Json file unavailable');
+        $concatCss = '';
+        foreach ($this->inlineCss as $inlineCss) {
+            $concatCss .= $this->normalizeStr($inlineCss);
         }
 
-        try {
-            $content = file_get_contents($manifestJson);
-            $datas = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-        } catch (Throwable $e) {
-            throw new RuntimeException('Assets Manifest Json file invalid');
-        }
-
-        $assets = [];
-        foreach ($datas as $name => $path) {
-            $assets[] = $this->registerAsset($name, $path);
-        }
-
-        if ($fallback !== null) {
-            array_walk($assets, $fallback);
-        }
-
-        return $this;
+        return $concatCss;
     }
 
     /**
-     * @inheritDoc
+     * HTML head global variables and inline JS concatenation.
+     *
+     * @return string
      */
-    public function setRelPrefix(string $relPrefix): AssetManagerInterface
+    protected function concatHeadInlineJs(): string
     {
-        $this->relPrefix = Filesystem::normalizePath($relPrefix);
+        $concatJs = '';
+        foreach ($this->headGlobalJsVars as $key => $vars) {
+            $this->headJsVarsNames[] = $key;
+            $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
+        }
 
-        return $this;
+        foreach ($this->headInlineJs as $inlineJs) {
+            $concatJs .= $this->normalizeStr($inlineJs) . ";";
+        }
+
+        return $concatJs;
     }
 
     /**
-     * Normalisation d'un chaîne de caractères.
+     * HTML footer global variables and inline JS concatenation.
+     *
+     * @return string
+     */
+    protected function concatFooterInlineJs(): string
+    {
+        $concatJs = '';
+        foreach ($this->footerGlobalJsVars as $key => $vars) {
+            if (is_array($vars) && in_array($key, $this->headJsVarsNames, true)) {
+                foreach ($vars as $k => $v) {
+                    $concatJs .= $key . "['$k']=" . $this->normalizeVars($v) . ";";
+                }
+            } else {
+                $concatJs .= "let $key=" . $this->normalizeVars($vars) . ";";
+            }
+        }
+
+        foreach ($this->footerInlineJs as $inlineJs) {
+            $concatJs .= $this->normalizeStr($inlineJs) . ";";
+        }
+
+        return $concatJs;
+    }
+
+    /**
+     * String normalization.
      *
      * @param string $str
      *
@@ -400,7 +525,7 @@ class AssetManager implements AssetManagerInterface
     }
 
     /**
-     * Normalisation de variables.
+     * Variables normalization.
      *
      * @param array|string|int|bool $vars
      *
@@ -422,13 +547,18 @@ class AssetManager implements AssetManagerInterface
                 $vars = '';
             }
         } elseif (is_scalar($vars)) {
-            $vars = (is_bool($vars) || is_int($vars)) ? $vars : "'". $this->normalizeStr((string)$vars) . "'";
+            $vars = (is_bool($vars) || is_int($vars)) ? $vars : "'" . $this->normalizeStr((string)$vars) . "'";
         } else {
             throw new InvalidArgumentException(
-                'Type of Asset vars are invalid. Only scalar or array of scalar allowed.'
+                'Type of asset vars are invalid. Only scalar or array of scalar allowed.'
             );
         }
 
         return (string)$vars;
+    }
+
+    private function mapRenderCallback(array $queueArray): string
+    {
+        return $queueArray['render'] ?? '';
     }
 }

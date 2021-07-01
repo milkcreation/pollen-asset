@@ -27,7 +27,6 @@ $asset->addInlineCss(
         background-color:AliceBlue;
     }'
 );
-var_dump($asset->headerStyles());
 
 // Add inline JS
 $asset->addInlineJs(
@@ -35,43 +34,27 @@ $asset->addInlineJs(
      console.log("value2");
      console.log("value3");'
 );
-var_dump($asset->headerScripts());
 
 // Add global JS var
 // -- app namespaced
 $asset->addGlobalJsVar('test1', 'test-value1');
-var_dump($asset->headerScripts());
+
 // -- in footer
 $asset->addGlobalJsVar('test2', 'test-value2', true);
-var_dump($asset->footerScripts());
+
 // -- in footer and without namespace
 $asset->addGlobalJsVar('test3', 'test-value3', true, null);
-var_dump($asset->footerScripts());
 
-// Enable CSS minification
-$asset->setMinifyCss();
-var_dump($asset->headerStyles());
-
-// Enable Js minification
-$asset->setMinifyJs();
-var_dump($asset->headerScripts());
 ```
 
-## Pollen Framework Setup
+## Register asset
 
-### Declaration
+@todo
 
-```php
-// config/app.php
-use Pollen\Asset\AssetServiceProvider;
+## Enqueue assets
 
-return [
-      //...
-      'providers' => [
-          //...
-          AssetServiceProvider::class,
-          //...
-      ]
-      // ...
-];
-```
+@todo
+
+## Cache and Minification
+
+Coming soon

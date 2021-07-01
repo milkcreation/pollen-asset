@@ -4,134 +4,36 @@ declare(strict_types=1);
 
 namespace Pollen\Asset;
 
-use Pollen\Support\Filesystem as fs;
+use Pollen\Support\Proxy\AssetProxy;
 
-class Asset implements AssetInterface
+abstract class Asset implements AssetInterface
 {
-    /**
-     * Gestionnaire des assets.
-     * @var AssetManagerInterface
-     */
-    protected $assetManager;
+    use AssetProxy;
 
     /**
-     * Chemin de base vers le répertoire du fichier.
-     * @var string|false
-     */
-    protected $baseDir;
-
-    /**
-     * Url de base vers le fichier.
-     * @var string|false
-     */
-    protected $baseUrl;
-
-    /**
-     * Nom de qualification.
+     * Asset name.
      * @var string
      */
-    protected $name;
+    protected string $name;
 
     /**
-     * Chemin relatif vers le fichier.
-     * @var string
+     * Asset type.
+     * @var string|null css|js|img|font|null
      */
-    protected $path;
+    protected ?string $type = null;
 
     /**
-     * Préfixe de l'url relative vers le fichier.
-     * @var string|false
+     * Asset related package.
+     * @var AssetPackageInterface|null
      */
-    protected $relPrefix;
+    protected ?AssetPackageInterface $package = null;
 
     /**
      * @param string $name
-     * @param string $path
-     * @param AssetManagerInterface $assetManager
      */
-    public function __construct(string $name, string $path, AssetManagerInterface $assetManager)
+    public function __construct(string $name)
     {
         $this->name = $name;
-        $this->path = fs::normalizePath($path);
-        $this->assetManager = $assetManager;
-    }
-
-    /**
-     * Résolution de sortie de la classe sous la forme d'une chaîne de caractères.
-     *
-     * @return string
-     */
-    public function __toString(): string
-    {
-        return $this->getRelPrefix();
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function contents(): string
-    {
-        return file_exists($this->filename()) ? file_get_contents($this->filename()) : '';
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function disableBaseDir(): AssetInterface
-    {
-        $this->baseDir = false;
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function disableBaseUrl(): AssetInterface
-    {
-        $this->baseUrl = false;
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function disableRelPrefix(): AssetInterface
-    {
-        $this->relPrefix = false;
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function filename(): string
-    {
-        return $this->getBaseDir() . fs::DS . $this->getPath(true);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getBaseDir(): string
-    {
-        if ($this->baseDir === null) {
-            $this->baseDir = $this->assetManager->getBaseDir();
-        }
-        return $this->baseDir ?: '';
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getBaseUrl(): string
-    {
-        if ($this->baseUrl === null) {
-            $this->baseUrl = $this->assetManager->getBaseUrl();
-        }
-        return $this->baseUrl ?: '';
     }
 
     /**
@@ -145,24 +47,23 @@ class Asset implements AssetInterface
     /**
      * @inheritDoc
      */
-    public function getPath(bool $normalized = false): string
+    public function getPackage(): ?AssetPackageInterface
     {
-        return $normalized ? $this->normalizePath($this->path) : $this->path;
+        return $this->package;
     }
 
     /**
      * @inheritDoc
      */
-    public function getRelPrefix(): string
+    public function setPackage(AssetPackageInterface $package): AssetInterface
     {
-        if ($this->relPrefix === null) {
-            $this->relPrefix = $this->assetManager->getRelPrefix();
-        }
-        return $this->relPrefix ?: '';
+        $this->package = $package;
+
+        return $this;
     }
 
     /**
-     * Normalisation d'un chemin.
+     * Path normalization.
      *
      * @param string $path
      * @param string $sep
@@ -171,52 +72,13 @@ class Asset implements AssetInterface
      */
     protected function normalizePath(string $path, string $sep = '/'): string
     {
-        return ltrim(rtrim($path, $sep), $sep);
-    }
+        $chunks = [];
+        foreach (explode($sep, $path) as $chunk) {
+            if (!empty($chunk)) {
+                $chunks[] = $chunk;
+            }
+        }
 
-    /**
-     * @inheritDoc
-     */
-    public function rel(): string
-    {
-        return $this->getRelPrefix() . '/' . $this->getPath(true);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function url(): string
-    {
-        return $this->getBaseUrl() . '/' . $this->getPath(true);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setBaseDir(string $baseDir): AssetInterface
-    {
-        $this->baseDir = fs::normalizePath($baseDir);
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setBaseUrl(string $baseUrl): AssetInterface
-    {
-        $this->baseUrl = fs::normalizePath($baseUrl);
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setRelPrefix(string $relPrefix): AssetInterface
-    {
-        $this->relPrefix = fs::normalizePath($relPrefix);
-
-        return $this;
+        return ltrim(rtrim(implode($sep, $chunks), $sep), $sep);
     }
 }
