@@ -101,15 +101,15 @@ class AssetManager implements AssetManagerInterface
 
     /**
      * List of asset render in HTML head queue.
-     * @var array<string, string>
+     * @var array<string, string>|null
      */
-    private array $headQueue = [];
+    private ?array $headQueue = null;
 
     /**
      * List of asset render in HTML footer queue.
-     * @var array<string, string>
+     * @var array<string, string>|null
      */
-    private array $footerQueue = [];
+    private ?array $footerQueue = null;
 
     /**
      * @param array $config
@@ -235,13 +235,17 @@ class AssetManager implements AssetManagerInterface
     public function enqueueCss(
         AssetInterface $asset,
         array $htmlAttrs = [],
-        int $priority = CssAssetQueue::NORMAL
+        int $priority = CssAssetQueue::NORMAL,
+        ?string $queueName = null
     ): AssetQueueInterface {
         if (!$this->get($asset->getName())) {
             $this->addAsset($asset);
         }
 
-        $this->enqueue($queue = new CssAssetQueue($asset, $htmlAttrs, $priority), $asset->getName());
+        $this->enqueue(
+            $queue = new CssAssetQueue($asset, $htmlAttrs, $priority),
+            $queueName ?? "css.{$asset->getName()}"
+        );
 
         return $queue;
     }
@@ -252,9 +256,10 @@ class AssetManager implements AssetManagerInterface
     public function enqueueHtml(
         string $html,
         bool $inFooter = false,
-        int $priority = HtmlQueue::NORMAL
+        int $priority = HtmlQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface {
-        $this->enqueue($queue = new HtmlQueue($html, $inFooter, $priority));
+        $this->enqueue($queue = new HtmlQueue($html, $inFooter, $priority), $queueName);
 
         return $queue;
     }
@@ -266,13 +271,17 @@ class AssetManager implements AssetManagerInterface
         AssetInterface $asset,
         bool $inFooter = false,
         array $htmlAttrs = [],
-        int $priority = JsAssetQueue::NORMAL
+        int $priority = JsAssetQueue::NORMAL,
+        ?string $queueName = null
     ): AssetQueueInterface {
         if (!$this->get($asset->getName())) {
             $this->addAsset($asset);
         }
 
-        $this->enqueue($queue = new JsAssetQueue($asset, $inFooter, $htmlAttrs, $priority), $asset->getName());
+        $this->enqueue(
+            $queue = new JsAssetQueue($asset, $inFooter, $htmlAttrs, $priority),
+            $queueName ?? "js.{$asset->getName()}"
+        );
 
         return $queue;
     }
@@ -281,12 +290,16 @@ class AssetManager implements AssetManagerInterface
      * @inheritDoc
      */
     public function enqueueLink(
-        string $name,
+        string $rel,
         string $href,
         array $htmlAttrs = [],
-        int $priority = LinkTagQueue::NORMAL
+        int $priority = LinkTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface {
-        $this->enqueue($queue = new LinkTagQueue($href, $name, $htmlAttrs, $priority), "_link.$name");
+        $this->enqueue(
+            $queue = new LinkTagQueue($href, $rel, $htmlAttrs, $priority),
+            $queueName ?? "_link.$rel"
+        );
 
         return $queue;
     }
@@ -298,9 +311,13 @@ class AssetManager implements AssetManagerInterface
         string $name,
         string $content,
         array $htmlAttrs = [],
-        int $priority = MetaTagQueue::NORMAL
+        int $priority = MetaTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface {
-        $this->enqueue($queue = new MetaTagQueue($content, $name, $htmlAttrs, $priority), "_meta.$name");
+        $this->enqueue(
+            $queue = new MetaTagQueue($content, $name, $htmlAttrs, $priority),
+            $queueName ?? "_meta.$name"
+        );
 
         return $queue;
     }
@@ -311,9 +328,13 @@ class AssetManager implements AssetManagerInterface
     public function enqueueTitle(
         string $title,
         array $htmlAttrs = [],
-        int $priority = TitleTagQueue::NORMAL
+        int $priority = TitleTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface {
-        $this->enqueue($queue = new TitleTagQueue($title, $htmlAttrs, $priority), '_title');
+        $this->enqueue(
+            $queue = new TitleTagQueue($title, $htmlAttrs, $priority),
+            $queueName ?? '_title'
+        );
 
         return $queue;
     }
@@ -345,91 +366,28 @@ class AssetManager implements AssetManagerInterface
     /**
      * @inheritDoc
      */
-    public function handleHeadQueue(): string
+    public function getFooter(): string
     {
-        $this->event()->trigger('asset.handle-head.before', [$this]);
+        $this->handleFooterQueue();
 
-        if ($cssContents = $this->concatHeadInlineCss()) {
-            $this->enqueueCss(new InlineAsset('_head-inline-css', $cssContents), [], CssAssetQueue::NORMAL + 1);
-        }
+        return $this->footerQueue ? implode("\n", array_map([$this, 'mapRenderCallback'], $this->footerQueue)) : '';
+    }
+    /**
+     * @inheritDoc
+     */
+    public function getHead(): string
+    {
+        $this->handleHeadQueue();
 
-        if ($jsContents = $this->concatHeadInlineJs()) {
-            $this->enqueueJs(new InlineAsset('_head-inline-js', $jsContents), false, [], JsAssetQueue::NORMAL + 1);
-        }
-
-        $this->event()->trigger('asset.handle-head.collect', [$this]);
-
-        $queueCollection = (new Collection($this->queuedAssets))
-            ->filter(
-                function (QueueInterface $queue) {
-                    return !$queue->inFooter();
-                }
-            )
-            ->sortByDesc(
-                function (QueueInterface $queue) {
-                    return $queue->getPriority();
-                }
-            );
-
-        /**
-         * @var string $name
-         * @var QueueInterface $queue
-         */
-        foreach ($queueCollection as $name => $queue) {
-            $this->event()->trigger('asset.handle-head.queue', [$name, $queue, $this]);
-            $this->headQueue[] = $queue->toArray();
-        }
-
-        $this->event()->trigger('asset.handle-head.after', [$this]);
-
-        return implode("\n", array_map([$this, 'mapRenderCallback'], $this->headQueue));
+        return $this->headQueue ? implode("\n", array_map([$this, 'mapRenderCallback'], $this->headQueue)) : '';
     }
 
     /**
      * @inheritDoc
      */
-    public function handleFooterQueue(): string
+    public function has(?string $name = null): bool
     {
-        $this->event()->trigger('asset.handle-footer.before', [$this]);
-
-        if ($jsContents = $this->concatFooterInlineJs()) {
-            $this->enqueueJs(new InlineAsset('_footer-inline-js', $jsContents), true, [], JsAssetQueue::NORMAL + 1);
-        }
-
-        $this->event()->trigger('asset.handle-footer.collect', [$this]);
-
-        $queueCollection = (new Collection($this->queuedAssets))
-            ->filter(
-                function (QueueInterface $queue) {
-                    return $queue->inFooter();
-                }
-            )
-            ->sortByDesc(
-                function (QueueInterface $queue) {
-                    return $queue->getPriority();
-                }
-            );
-
-        /**
-         * @var string $name
-         * @var QueueInterface $queue
-         */
-        foreach ($queueCollection as $name => $queue) {
-            $this->event()->trigger('asset.handle-footer.queue', [$name, $queue, $this]);
-            $this->footerQueue[] = $queue->toArray();
-        }
-
-        $this->event()->trigger('asset.handle-footer.after', [$this]);
-
-        return implode("\n", array_map([$this, 'mapRenderCallback'], $this->footerQueue));
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function has(): bool
-    {
-        return !empty($this->assets);
+        return $name !== null ? isset($this->assets[$name]) : !empty($this->assets);
     }
 
     /**
@@ -448,6 +406,16 @@ class AssetManager implements AssetManagerInterface
     public function setBaseUrl(string $baseUrl): AssetManagerInterface
     {
         $this->baseUrl = fs::normalizePath($baseUrl);
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function remove(string $name): AssetManagerInterface
+    {
+        unset($this->assets[$name]);
 
         return $this;
     }
@@ -510,6 +478,96 @@ class AssetManager implements AssetManagerInterface
         }
 
         return $concatJs;
+    }
+
+    /**
+     * HTML footer queue handling.
+     *
+     * @return void
+     */
+    protected function handleFooterQueue(): void
+    {
+        if ($this->footerQueue === null) {
+            $this->footerQueue = [];
+
+            $this->event()->trigger('asset.handle-footer.before', [$this]);
+
+            if ($jsContents = $this->concatFooterInlineJs()) {
+                $this->enqueueJs(new InlineAsset('_footer-inline-js', $jsContents), true, [], JsAssetQueue::NORMAL + 1);
+            }
+
+            $this->event()->trigger('asset.handle-footer.collect', [$this]);
+
+            $queueCollection = (new Collection($this->queuedAssets))
+                ->filter(
+                    function (QueueInterface $queue) {
+                        return $queue->inFooter();
+                    }
+                )
+                ->sortByDesc(
+                    function (QueueInterface $queue) {
+                        return $queue->getPriority();
+                    }
+                );
+
+            /**
+             * @var string $name
+             * @var QueueInterface $queue
+             */
+            foreach ($queueCollection as $name => $queue) {
+                $this->event()->trigger('asset.handle-footer.queue', [$name, $queue, $this]);
+                $this->footerQueue[] = $queue->toArray();
+            }
+
+            $this->event()->trigger('asset.handle-footer.after', [$this]);
+        }
+    }
+
+    /**
+     * HTML head queue handling.
+     *
+     * @return void
+     */
+    protected function handleHeadQueue(): void
+    {
+        if ($this->headQueue === null) {
+            $this->headQueue = [];
+
+            $this->event()->trigger('asset.handle-head.before', [$this]);
+
+            if ($cssContents = $this->concatHeadInlineCss()) {
+                $this->enqueueCss(new InlineAsset('_head-inline-css', $cssContents), [], CssAssetQueue::NORMAL + 1);
+            }
+
+            if ($jsContents = $this->concatHeadInlineJs()) {
+                $this->enqueueJs(new InlineAsset('_head-inline-js', $jsContents), false, [], JsAssetQueue::NORMAL + 1);
+            }
+
+            $this->event()->trigger('asset.handle-head.collect', [$this]);
+
+            $queueCollection = (new Collection($this->queuedAssets))
+                ->filter(
+                    function (QueueInterface $queue) {
+                        return !$queue->inFooter();
+                    }
+                )
+                ->sortByDesc(
+                    function (QueueInterface $queue) {
+                        return $queue->getPriority();
+                    }
+                );
+
+            /**
+             * @var string $name
+             * @var QueueInterface $queue
+             */
+            foreach ($queueCollection as $name => $queue) {
+                $this->event()->trigger('asset.handle-head.queue', [$name, $queue, $this]);
+                $this->headQueue[] = $queue->toArray();
+            }
+
+            $this->event()->trigger('asset.handle-head.after', [$this]);
+        }
     }
 
     /**

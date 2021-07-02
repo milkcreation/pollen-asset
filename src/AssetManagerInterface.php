@@ -89,13 +89,15 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @param AssetInterface $asset
      * @param array $htmlAttrs
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return AssetQueueInterface
      */
     public function enqueueCss(
         AssetInterface $asset,
         array $htmlAttrs = [],
-        int $priority = CssAssetQueue::NORMAL
+        int $priority = CssAssetQueue::NORMAL,
+        ?string $queueName = null
     ): AssetQueueInterface;
 
     /**
@@ -104,13 +106,15 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @param string $html
      * @param bool $inFooter
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return QueueInterface
      */
     public function enqueueHtml(
         string $html,
         bool $inFooter = false,
-        int $priority = HtmlQueue::NORMAL
+        int $priority = HtmlQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface;
 
     /**
@@ -120,6 +124,7 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @param bool $inFooter
      * @param array $htmlAttrs
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return AssetQueueInterface
      */
@@ -127,24 +132,27 @@ interface AssetManagerInterface extends ContainerProxyInterface
         AssetInterface $asset,
         bool $inFooter = false,
         array $htmlAttrs = [],
-        int $priority = JsAssetQueue::NORMAL
+        int $priority = JsAssetQueue::NORMAL,
+        ?string $queueName = null
     ): AssetQueueInterface;
 
     /**
      * Add a link tag in queue.
      *
-     * @param string $name
+     * @param string $rel
      * @param string $href
      * @param array $htmlAttrs
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return QueueInterface
      */
     public function enqueueLink(
-        string $name,
+        string $rel,
         string $href,
         array $htmlAttrs = [],
-        int $priority = LinkTagQueue::NORMAL
+        int $priority = LinkTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface;
 
     /**
@@ -154,6 +162,7 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @param string $content
      * @param array $htmlAttrs
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return QueueInterface
      */
@@ -161,7 +170,8 @@ interface AssetManagerInterface extends ContainerProxyInterface
         string $name,
         string $content,
         array $htmlAttrs = [],
-        int $priority = MetaTagQueue::NORMAL
+        int $priority = MetaTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface;
 
     /**
@@ -170,13 +180,15 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @param string $title
      * @param array $htmlAttrs
      * @param int $priority
+     * @param string|null $queueName
      *
      * @return QueueInterface
      */
     public function enqueueTitle(
         string $title,
         array $htmlAttrs = [],
-        int $priority = TitleTagQueue::NORMAL
+        int $priority = TitleTagQueue::NORMAL,
+        ?string $queueName = null
     ): QueueInterface;
 
     /**
@@ -203,25 +215,27 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function getBaseUrl(): ?string;
 
     /**
-     * HTML head queue handling.
+     * Get HTML footer.
      *
      * @return string
      */
-    public function handleHeadQueue(): string;
+    public function getFooter(): string;
 
     /**
-     * HTML footer queue handling.
+     * Get HTML head.
      *
      * @return string
      */
-    public function handleFooterQueue(): string;
+    public function getHead(): string;
 
     /**
-     * Check if registered assets exists.
+     * Check if registered asset exists.
+     *
+     * @param string|null $name
      *
      * @return bool
      */
-    public function has(): bool;
+    public function has(?string $name = null): bool;
 
     /**
      * Set base directory of assets.
@@ -240,4 +254,13 @@ interface AssetManagerInterface extends ContainerProxyInterface
      * @return static
      */
     public function setBaseUrl(string $baseUrl): AssetManagerInterface;
+
+    /**
+     * Remove registered asset.
+     *
+     * @param string $name
+     *
+     * @return static
+     */
+    public function remove(string $name): AssetManagerInterface;
 }
