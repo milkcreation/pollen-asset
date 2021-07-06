@@ -84,6 +84,23 @@ interface AssetManagerInterface extends ContainerProxyInterface
     public function enqueue(QueueInterface $queue, ?string $name = null): AssetManagerInterface;
 
     /**
+     * Add the meta tag charset encoding in queue.
+     *
+     * @param string $charset
+     * @param array $htmlAttrs
+     * @param int $priority
+     * @param string|null $queueName
+     *
+     * @return QueueInterface
+     */
+    public function enqueueCharset(
+        string $charset = 'UTF-8',
+        array $htmlAttrs = [],
+        int $priority = TitleTagQueue::NORMAL,
+        ?string $queueName = null
+    ): QueueInterface;
+
+    /**
      * Add a registered asset in CSS queue.
      *
      * @param AssetInterface $asset
