@@ -7,6 +7,7 @@ namespace Pollen\Asset;
 use InvalidArgumentException;
 use Illuminate\Support\Collection;
 use Pollen\Asset\Assets\InlineAsset;
+use Pollen\Asset\Queues\CharsetTagQueue;
 use Pollen\Asset\Queues\CssAssetQueue;
 use Pollen\Asset\Queues\HtmlQueue;
 use Pollen\Asset\Queues\JsAssetQueue;
@@ -227,6 +228,22 @@ class AssetManager implements AssetManagerInterface
             $this->queuedAssets[] = $queue;
         }
         return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function enqueueCharset(string $charset = 'UTF-8',
+        array $htmlAttrs = [],
+        int $priority = TitleTagQueue::NORMAL,
+        ?string $queueName = null
+    ): QueueInterface {
+        $this->enqueue(
+            $queue = new CharsetTagQueue($charset, $htmlAttrs, $priority),
+            $queueName ?? '_charset'
+        );
+
+        return $queue;
     }
 
     /**
