@@ -14,7 +14,6 @@ class CssAssetQueue extends AssetQueue
 {
     /**
      * Normal priority.
-     *
      * @const int
      */
     public const NORMAL = 25;

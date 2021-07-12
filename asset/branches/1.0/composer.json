@@ -7,7 +7,7 @@
     "plugins",
     "asset"
   ],
-  "time": "2021-07-06",
+  "time": "2021-07-09",
   "license": "MIT",
   "authors": [
     {
@@ -15,14 +15,9 @@
       "email": "jordy@presstify.com"
     }
   ],
-  "repositories": [
-    {
-      "type": "composer",
-      "url": "https://composer.presstify.com/pollen-solutions/"
-    }
-  ],
   "require": {
     "php": "^7.4 || ^8.0",
+    "ext-json": "*",
     "matthiasmullie/minify": "^1.3",
     "pollen-solutions/event": "^1.0",
     "pollen-solutions/http": "^1.0",

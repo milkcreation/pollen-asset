@@ -11,7 +11,6 @@ class CharsetTagQueue extends Queue
 {
     /**
      * Normal priority.
-     *
      * @const int
      */
     public const NORMAL = 90;

@@ -11,7 +11,6 @@ class TitleTagQueue extends Queue
 {
     /**
      * Normal priority.
-     *
      * @const int
      */
     public const NORMAL = 80;

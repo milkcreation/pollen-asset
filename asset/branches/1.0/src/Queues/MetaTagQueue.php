@@ -11,7 +11,6 @@ class MetaTagQueue extends Queue
 {
     /**
      * Normal priority.
-     *
      * @const int
      */
     public const NORMAL = 75;

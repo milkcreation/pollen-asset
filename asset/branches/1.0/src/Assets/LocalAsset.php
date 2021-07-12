@@ -115,7 +115,7 @@ class LocalAsset extends Asset implements UrlAssetInterface
      */
     public function getContents(): string
     {
-        return file_exists($this->getRealPath()) ? file_get_contents($this->getRealPath()) : '';
+        return file_exists($this->getPathname()) ? file_get_contents($this->getPathname()) : '';
     }
 
     /**
@@ -126,9 +126,9 @@ class LocalAsset extends Asset implements UrlAssetInterface
     public function getRelPath(): string
     {
         if ($this->relPath === null) {
-            if (preg_match('/^' . preg_quote($this->getBasePath(), fs::DS) . '/', $this->getRealPath())) {
+            if (preg_match('/^' . preg_quote($this->getBasePath(), fs::DS) . '/', $this->getPathname())) {
                 $this->relPath = preg_replace(
-                    '/^' . preg_quote($this->getBasePath(), fs::DS) . '/', '', $this->getRealPath()
+                    '/^' . preg_quote($this->getBasePath(), fs::DS) . '/', '', $this->getPathname()
                 );
             } else {
                 $this->relPath = null;
