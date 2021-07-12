@@ -17,12 +17,6 @@ abstract class Asset implements AssetInterface
     protected string $name;
 
     /**
-     * Asset type.
-     * @var string|null css|js|img|font|null
-     */
-    protected ?string $type = null;
-
-    /**
      * Asset related package.
      * @var AssetPackageInterface|null
      */
