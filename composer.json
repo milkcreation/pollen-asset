@@ -1,13 +1,13 @@
 {
   "name": "pollen-solutions/asset",
   "description": "Pollen Asset Component - Manage CSS styles, JS scripts, ...",
-  "homepage": "https://www.presstify.com/pollen-solutions/asset/",
+  "homepage": "https://github.com/milkcreation/pollen-asset.git",
   "keywords": [
     "presstify",
     "plugins",
     "asset"
   ],
-  "time": "2021-07-09",
+  "time": "2021-09-14",
   "license": "MIT",
   "authors": [
     {
